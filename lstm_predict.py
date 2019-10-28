@@ -10,11 +10,16 @@ from keras.preprocessing.sequence import pad_sequences
 from keras.models import Sequential, load_model
 from keras.layers import Embedding, Bidirectional, LSTM, Dense, TimeDistributed, Dropout
 from keras_contrib.layers.crf import CRF
-import matplotlib.pyplot as plt
 import os
 import copy
+import pickle
+import io
+import sys
 
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+cur = "/".join(os.path.abspath(__file__).split(os.sep)[:-1])
+icd_pick = os.path.join(cur, "data" + os.sep + "ICD-11.pick")
 
 
 class LSTMNER:
@@ -158,7 +163,8 @@ def compose_signs(text_dicts):
             # print("病症提取")
             # print(item[0], item[1])
             if item[1] == "SIGNS-B":
-                if single_sign:
+                # 不处理一个字符的情况
+                if len(single_sign.strip()) > 1:
                     total_signs.append(single_sign)
                 single_sign = item[0]
             else:
@@ -171,7 +177,8 @@ def compose_signs(text_dicts):
             # print(item[0], item[1])
             # 疾病开始位置 如果之前获取过疾病则说明进入新的疾病词汇
             if item[1] == "DISEASE-B":
-                if single_disease:
+                # 不处理一个字符的情况
+                if len(single_disease.strip()) > 1:
                     total_diseases.append(single_disease)
                 single_disease = item[0]
             else:
@@ -179,8 +186,10 @@ def compose_signs(text_dicts):
             # if not len(single_disease) <= 1:
             #     total_diseases.append(single_disease)
     # 添加最后的疾病和病症
-    total_diseases.append(single_disease)
-    total_signs.append(single_sign)
+    if len(single_disease.strip()) > 1:
+        total_diseases.append(single_disease)
+    if len(single_sign.strip()) > 1:
+        total_signs.append(single_sign)
     return total_signs, total_diseases
 
 
@@ -207,9 +216,13 @@ def compose_signs(text_dicts):
 
 
 if __name__ == "__main__":
+
     ner = LSTMNER()
     # while 1:
     # s = input("enter an sent:").strip()
+    f = open(icd_pick, "rb")
+    icd_11_dict = pickle.load(f)
+
     samples = [
         "他最近头痛,流鼻涕,估计是发烧了",
         "他骨折了,可能需要拍片",
@@ -227,8 +240,25 @@ if __name__ == "__main__":
         print(item)
         print("signs")
         print(signs)
+        for name, code in icd_11_dict.items():
+            for sign in signs:
+                if sign.strip() and sign in name:
+                    print(
+                        "sign : {sign}, std_sign:{std_sign}, code:{code}".format(
+                            sign=sign, std_sign=name, code=code
+                        )
+                    )
+
         print("diseases")
         print(diseases)
+        for name, code in icd_11_dict.items():
+            for disease in diseases:
+                if disease.strip() and disease in name:
+                    print(
+                        "disease : {disease}, std_disease:{std_disease}, code:{code}".format(
+                            disease=disease, std_disease=name, code=code
+                        )
+                    )
         print("=" * 80)
 
 #         sample input
